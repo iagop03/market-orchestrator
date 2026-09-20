@@ -79,7 +79,7 @@ class MarketDrivenOrchestrator:
 
             opp.state = OpportunityState.VALIDATING.value
             try:
-                validator = get_validator(opp.niche_title)
+                validator = get_validator(opp.niche_title, opp.category)
                 validation = await asyncio.to_thread(
                     validator.validate, opp.niche_title, opp.niche_description, opp.category
                 )

@@ -104,7 +104,7 @@ async def test_validate_pending_moves_high_score_low_effort_to_validated(orchest
 
     monkeypatch.setattr(
         "orchestrator.main.get_validator",
-        lambda niche_title: FakeValidator(
+        lambda niche_title, category: FakeValidator(
             {"viability_score": 8.5, "market_size_estimate": "niche", "effort_estimate": "2 weeks"}
         ),
     )
@@ -124,7 +124,7 @@ async def test_validate_pending_rejects_low_score(orchestrator, db_session, monk
 
     monkeypatch.setattr(
         "orchestrator.main.get_validator",
-        lambda niche_title: FakeValidator(
+        lambda niche_title, category: FakeValidator(
             {"viability_score": 2.0, "market_size_estimate": "large", "effort_estimate": "1 weeks"}
         ),
     )
@@ -145,7 +145,7 @@ async def test_validate_pending_reverts_to_discovered_on_validator_error(orchest
         def validate(self, *args, **kwargs):
             raise RuntimeError("GitHub is down")
 
-    monkeypatch.setattr("orchestrator.main.get_validator", lambda niche_title: BoomValidator())
+    monkeypatch.setattr("orchestrator.main.get_validator", lambda niche_title, category: BoomValidator())
 
     await orchestrator._validate_pending(db_session)
     db_session.commit()

@@ -85,9 +85,23 @@ normally and only the final build step fails-and-retries next cycle. See the com
 top of `docker-compose.yml` for details, including how to add `antcrew` to the image if you want
 builds to actually complete inside compose.
 
-## Adding a validator
+## Validators
 
-Add a module under `src/orchestrator/validators/`, subclass `BaseValidator`, and register it in `validators/__init__.py`'s `get_validator()`. See `generic_saas.py` for the default and `cobol_automation.py` for an example of tuning it per category.
+`get_validator(niche_title, category)` routes to a specialized `GenericSaaSValidator` subclass —
+a title-level legacy/COBOL signal wins over category (more specific than a keyword-derived
+category assignment); otherwise routing follows the discovery-assigned `category` directly:
+
+| Category | Validator | Tuning |
+|---|---|---|
+| (title contains "cobol"/"legacy") | `CobolAutomationValidator` | +1.5 score bump — low competitor counts here reflect a genuinely underserved market, not low demand |
+| `security` | `SecurityValidator` | Steeper competitor penalty (trust is a bigger moat), minimum 3-week effort floor |
+| `data` | `DataScienceValidator` | Gentler competitor penalty (ecosystems coexist rather than winner-take-all), +2 week effort |
+| `mobile` | `MobileValidator` | +1 week effort, minimum 2-week floor (cross-platform + app store review) |
+| anything else | `GenericSaaSValidator` | The default: GitHub competitor density + a word-count effort heuristic |
+
+To add another one: create a module under `src/orchestrator/validators/`, subclass
+`GenericSaaSValidator` (or `BaseValidator` directly), and register it in
+`validators/__init__.py`'s `_VALIDATOR_CLASSES` + the `get_validator()` routing.
 
 ## Tests
 
