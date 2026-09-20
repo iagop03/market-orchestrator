@@ -3,6 +3,8 @@ import os
 
 from github import Github
 
+from orchestrator.retry import retry_sync
+
 from .base import BaseValidator
 
 logger = logging.getLogger(__name__)
@@ -37,7 +39,7 @@ class GenericSaaSValidator(BaseValidator):
     def _count_competitors(self, niche_title: str) -> int:
         try:
             query = " ".join(niche_title.split()[:6])
-            result = self.github.search_repositories(query=query)
+            result = retry_sync(lambda: self.github.search_repositories(query=query))
             return min(result.totalCount, 999)
         except Exception:
             logger.warning("GitHub search failed for %r", niche_title, exc_info=True)

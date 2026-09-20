@@ -16,10 +16,23 @@ Validators (`src/orchestrator/validators/`) have no lifecycle of their own — t
 ```bash
 pip install -e ".[dev]"
 cp .env.example .env
-python scripts/init_db.py
+python scripts/init_db.py  # applies Alembic migrations
 ```
 
 `antcrew` must be installed and on `PATH` (`pip install antcrew`) for the build stage to run.
+
+## Database migrations
+
+Schema changes go through Alembic (`alembic/versions/`), not `Base.metadata.create_all()` directly —
+`create_all()` only creates missing tables, so an existing deployed DB would silently miss any new
+column added to a model. After changing a model:
+
+```bash
+alembic revision --autogenerate -m "describe the change"
+alembic upgrade head
+```
+
+`scripts/init_db.py` (`alembic upgrade head`) is the one command to run on a fresh or an existing DB.
 
 ## Run
 
@@ -48,6 +61,29 @@ uvicorn orchestrator.api.app:app --reload
 - `GET /opportunities/{id}` — full detail for one opportunity, including its validation and build result.
 
 Read-only: this is for observability into the orchestrator's own state, not a control surface — it doesn't trigger cycles or mutate anything.
+
+## Docker (full local pipeline)
+
+`docker-compose.yml` in this repo runs the whole pipeline — both services, each with its own
+Postgres — for local smoke testing. It assumes `market-discovery` is checked out as a sibling
+directory:
+
+```
+projects/
+├── market-discovery/
+└── market-orchestrator/   <- docker-compose.yml lives here
+```
+
+```bash
+docker compose up --build
+```
+
+Reddit/GitHub/Slack credentials are optional — everything degrades gracefully without them (see
+each source/validator's own resilience handling). `antcrew` itself is not installed in the image
+(it's a subprocess CLI dependency, not a Python import); without it, discovery/validation still run
+normally and only the final build step fails-and-retries next cycle. See the comment block at the
+top of `docker-compose.yml` for details, including how to add `antcrew` to the image if you want
+builds to actually complete inside compose.
 
 ## Adding a validator
 

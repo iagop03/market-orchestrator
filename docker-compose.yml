@@ -1,0 +1,113 @@
+# Local dev environment for the full pipeline: market-discovery + market-orchestrator.
+#
+# Assumes both repos are checked out as siblings on disk:
+#   projects/
+#   ├── market-discovery/
+#   └── market-orchestrator/   <- this file lives here
+#
+# Usage:
+#   docker compose up --build
+#
+# Reddit/GitHub/Slack credentials are all optional for a local smoke test — each
+# source/validator degrades gracefully (logs and continues) without them, per their
+# own resilience handling. Set them in a `.env` file next to this one, or export them
+# in your shell, to get real scraping/validation/Slack notifications.
+#
+# `antcrew` itself is NOT installed in the orchestrator image (it's a subprocess CLI
+# dependency by design, not a Python import — see docker/Dockerfile). Without it, the
+# pipeline still discovers/validates/rejects normally; only the final build step fails
+# and the opportunity reverts to VALIDATED for retry next cycle. Add
+# `RUN pip install antcrew` to market-orchestrator/docker/Dockerfile if you want builds
+# to actually run inside this compose setup.
+
+services:
+  discovery-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: market_discovery
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - discovery-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  discovery-scraper:
+    build:
+      context: ../market-discovery
+      dockerfile: docker/Dockerfile
+    command: sh -c "python scripts/init_db.py && market-discovery"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@discovery-db:5432/market_discovery
+      REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
+      REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      WEBHOOK_URL: ${DISCOVERY_WEBHOOK_URL:-}
+    depends_on:
+      discovery-db:
+        condition: service_healthy
+
+  discovery-api:
+    build:
+      context: ../market-discovery
+      dockerfile: docker/Dockerfile
+    command: sh -c "python scripts/init_db.py && uvicorn market_discovery.api.app:app --host 0.0.0.0 --port 8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@discovery-db:5432/market_discovery
+    ports:
+      - "8000:8000"
+    depends_on:
+      discovery-db:
+        condition: service_healthy
+
+  orchestrator-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: market_orchestrator
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - orchestrator-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: sh -c "python scripts/init_db.py && market-orchestrator"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@orchestrator-db:5432/market_orchestrator
+      DISCOVERY_API_URL: http://discovery-api:8000
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      ANTCREW_PATH: ${ANTCREW_PATH:-antcrew}
+      ANTCREW_MODEL: ${ANTCREW_MODEL:-claude}
+    depends_on:
+      orchestrator-db:
+        condition: service_healthy
+      discovery-api:
+        condition: service_started
+
+  orchestrator-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: sh -c "python scripts/init_db.py && uvicorn orchestrator.api.app:app --host 0.0.0.0 --port 8001"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@orchestrator-db:5432/market_orchestrator
+    ports:
+      - "8001:8001"
+    depends_on:
+      orchestrator-db:
+        condition: service_healthy
+
+volumes:
+  discovery-db-data:
+  orchestrator-db-data:
