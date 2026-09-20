@@ -30,3 +30,10 @@ def test_should_validate_skips_terminal_states():
     engine = DecisionEngine()
     opp = make_opportunity(state=OpportunityState.SHIPPED.value)
     assert engine.should_validate(opp) is False
+
+
+def test_should_build_false_for_unparseable_effort():
+    """Fails closed: an effort estimate we can't parse must not silently bypass the cap."""
+    engine = DecisionEngine()
+    opp = make_opportunity(viability_score=9.0, effort="N/A")
+    assert engine.should_build(opp) is False

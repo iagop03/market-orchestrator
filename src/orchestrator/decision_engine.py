@@ -24,7 +24,10 @@ class DecisionEngine:
             return False
 
         weeks = self._parse_weeks(opp.effort)
-        if weeks is not None and weeks > MAX_EFFORT_WEEKS:
+        if weeks is None:
+            logger.warning("Unparseable effort estimate %r; rejecting to fail closed", opp.effort)
+            return False
+        if weeks > MAX_EFFORT_WEEKS:
             logger.info("Effort %s weeks exceeds cap of %s", weeks, MAX_EFFORT_WEEKS)
             return False
 

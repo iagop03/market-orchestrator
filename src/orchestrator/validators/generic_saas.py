@@ -7,17 +7,26 @@ from .base import BaseValidator
 
 logger = logging.getLogger(__name__)
 
+# Categories that typically carry extra infra/compliance work beyond the raw feature scope.
+HIGHER_EFFORT_CATEGORIES = {"devops", "security"}
+
 
 class GenericSaaSValidator(BaseValidator):
     """Rule-based viability check: GitHub competitor density + a scope heuristic on effort."""
 
     def __init__(self, github_token: str | None = None):
         token = github_token or os.getenv("GITHUB_TOKEN", "")
+        if not token:
+            logger.warning(
+                "GenericSaaSValidator running unauthenticated — GitHub's search API "
+                "rate-limits unauthenticated requests heavily; set GITHUB_TOKEN. A failed "
+                "search silently counts as 0 competitors, which inflates the viability score."
+            )
         self.github = Github(token) if token else Github()
 
-    def validate(self, niche_title: str, niche_description: str) -> dict:
+    def validate(self, niche_title: str, niche_description: str, category: str = "other") -> dict:
         competitors_count = self._count_competitors(niche_title)
-        effort_weeks = self._estimate_effort(niche_description)
+        effort_weeks = self._estimate_effort(niche_description, category)
         return {
             "viability_score": self._score(competitors_count, effort_weeks),
             "market_size_estimate": self._estimate_market_size(competitors_count),
@@ -34,13 +43,18 @@ class GenericSaaSValidator(BaseValidator):
             logger.warning("GitHub search failed for %r", niche_title, exc_info=True)
             return 0
 
-    def _estimate_effort(self, niche_description: str) -> int:
+    def _estimate_effort(self, niche_description: str, category: str = "other") -> int:
         words = len(niche_description.split())
         if words < 20:
-            return 1
-        if words < 60:
-            return 2
-        return 4
+            weeks = 1
+        elif words < 60:
+            weeks = 2
+        else:
+            weeks = 4
+
+        if category in HIGHER_EFFORT_CATEGORIES:
+            weeks += 1
+        return weeks
 
     def _estimate_market_size(self, competitors_count: int) -> str:
         if competitors_count == 0:

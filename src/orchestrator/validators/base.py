@@ -9,5 +9,5 @@ class BaseValidator(ABC):
     """
 
     @abstractmethod
-    def validate(self, niche_title: str, niche_description: str) -> dict:
+    def validate(self, niche_title: str, niche_description: str, category: str = "other") -> dict:
         ...

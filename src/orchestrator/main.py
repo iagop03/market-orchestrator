@@ -75,7 +75,7 @@ class MarketDrivenOrchestrator:
             try:
                 validator = get_validator(opp.niche_title)
                 validation = await asyncio.to_thread(
-                    validator.validate, opp.niche_title, opp.niche_description
+                    validator.validate, opp.niche_title, opp.niche_description, opp.category
                 )
 
                 opp.viability_score = validation.get("viability_score", 0)

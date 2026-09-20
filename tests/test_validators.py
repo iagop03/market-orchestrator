@@ -15,3 +15,11 @@ def test_score_bounds():
     validator = GenericSaaSValidator()
     assert 0.0 <= validator._score(competitors_count=0, effort_weeks=1) <= 10.0
     assert 0.0 <= validator._score(competitors_count=500, effort_weeks=10) <= 10.0
+
+
+def test_devops_and_security_categories_get_higher_effort_estimate():
+    validator = GenericSaaSValidator()
+    description = "a short description"
+    assert validator._estimate_effort(description, category="other") == 1
+    assert validator._estimate_effort(description, category="devops") == 2
+    assert validator._estimate_effort(description, category="security") == 2
