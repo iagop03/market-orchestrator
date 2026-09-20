@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 
 from orchestrator.config import Settings
 from orchestrator.database import get_session, init_db
+from orchestrator.logging_config import configure_logging
 from orchestrator.state_machine import Opportunity, OpportunityState
 
 VALID_STATES = {s.value for s in OpportunityState}
@@ -11,6 +12,7 @@ VALID_STATES = {s.value for s in OpportunityState}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_logging()
     init_db(Settings().database_url)
     yield
 

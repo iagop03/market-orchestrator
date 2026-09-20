@@ -7,13 +7,10 @@ from orchestrator.decision_engine import DecisionEngine
 from orchestrator.integrations.antcrew_client import AntCrewClient
 from orchestrator.integrations.discovery_client import DiscoveryClient
 from orchestrator.integrations.slack import SlackNotifier
+from orchestrator.logging_config import configure_logging
 from orchestrator.state_machine import Opportunity, OpportunityState
 from orchestrator.validators import get_validator
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 CYCLE_INTERVAL_SECONDS = 3600
@@ -132,6 +129,7 @@ class MarketDrivenOrchestrator:
 
 
 async def _main() -> None:
+    configure_logging()
     settings = Settings()
     init_db(settings.database_url)
     await MarketDrivenOrchestrator(settings).run()
