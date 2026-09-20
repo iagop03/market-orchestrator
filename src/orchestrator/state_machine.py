@@ -42,10 +42,21 @@ class Opportunity(Base):
         return {
             "id": self.id,
             "niche_title": self.niche_title,
+            "source": self.source,
+            "category": self.category,
             "state": self.state,
             "viability_score": self.viability_score,
             "market_size": self.market_size,
             "effort": self.effort,
+            "created_at": self.created_at.isoformat(),
+        }
+
+    def to_detail_dict(self) -> dict:
+        return {
+            **self.to_dict(),
+            "niche_description": self.niche_description,
+            "validation_result": self.validation_result,
+            "build_result": self.build_result,
         }
 
     @staticmethod

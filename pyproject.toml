@@ -17,7 +17,8 @@ dependencies = [
 
 [project.optional-dependencies]
 postgres = ["psycopg2-binary>=2.9"]
-dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "black>=23.0"]
+api = ["fastapi>=0.110", "uvicorn>=0.29"]
+dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "black>=23.0", "fastapi>=0.110"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

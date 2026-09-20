@@ -35,6 +35,20 @@ Runs sync → validate → build once an hour:
 
 Set `SLACK_WEBHOOK_URL` in `.env` to get a notification at each validate/build outcome.
 
+## Expose state over HTTP (optional)
+
+```bash
+pip install -e ".[api]"
+uvicorn orchestrator.api.app:app --reload
+```
+
+- `GET /health` — liveness check.
+- `GET /stats` — opportunity counts per state.
+- `GET /opportunities?state=&limit=` — list opportunities, optionally filtered by state.
+- `GET /opportunities/{id}` — full detail for one opportunity, including its validation and build result.
+
+Read-only: this is for observability into the orchestrator's own state, not a control surface — it doesn't trigger cycles or mutate anything.
+
 ## Adding a validator
 
 Add a module under `src/orchestrator/validators/`, subclass `BaseValidator`, and register it in `validators/__init__.py`'s `get_validator()`. See `generic_saas.py` for the default and `cobol_automation.py` for an example of tuning it per category.
