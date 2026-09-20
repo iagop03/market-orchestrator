@@ -3,6 +3,7 @@ import os
 
 from github import Github
 
+from orchestrator.rate_limit import RateLimiter
 from orchestrator.retry import retry_sync
 
 from .base import BaseValidator
@@ -25,6 +26,7 @@ class GenericSaaSValidator(BaseValidator):
                 "search silently counts as 0 competitors, which inflates the viability score."
             )
         self.github = Github(token) if token else Github()
+        self._rate_limiter = RateLimiter(min_interval=2.0)  # GitHub search API: ~30 req/min authenticated
 
     def validate(self, niche_title: str, niche_description: str, category: str = "other") -> dict:
         competitors_count = self._count_competitors(niche_title)
@@ -38,6 +40,7 @@ class GenericSaaSValidator(BaseValidator):
 
     def _count_competitors(self, niche_title: str) -> int:
         try:
+            self._rate_limiter.acquire()
             query = " ".join(niche_title.split()[:6])
             result = retry_sync(lambda: self.github.search_repositories(query=query))
             return min(result.totalCount, 999)

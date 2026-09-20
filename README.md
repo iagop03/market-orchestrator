@@ -94,3 +94,35 @@ Add a module under `src/orchestrator/validators/`, subclass `BaseValidator`, and
 ```bash
 pytest
 ```
+
+Runs the unit/wiring suite (mocked network, in-memory DB). Real cross-repo integration
+tests are opt-in and excluded by default:
+
+```bash
+pytest -m integration
+```
+
+`test_cross_repo_integration.py` spins up a real market-discovery API server (an actual
+`uvicorn` subprocess, real HTTP over a real socket, real SQLite migrated via Alembic) and
+runs the full sync → validate → build cycle against it — only `antcrew_client` is faked,
+since the real `antcrew` CLI is an external tool this repo doesn't install. It needs
+market-discovery checked out as a sibling directory with its own `.venv` set up
+(`pip install -e ".[dev,api]"` there); otherwise it skips itself with a clear message.
+
+## Deploy to Railway
+
+`railway.json` points Railway at `docker/Dockerfile` and runs migrations before the
+orchestrator loop on every deploy (`python scripts/init_db.py && market-orchestrator`).
+
+1. Add a Postgres database in the Railway project — it auto-injects `DATABASE_URL`
+   (make sure `psycopg2-binary` is available: the Dockerfile installs the `postgres` extra).
+2. Set `DISCOVERY_API_URL` (pointing at your deployed market-discovery service),
+   `GITHUB_TOKEN`, `SLACK_WEBHOOK_URL`, `ANTCREW_MODEL` as needed (see `.env.example`).
+3. **`antcrew` must be added to the image for the build step to do anything in production** —
+   it's deliberately not installed by default (see "Why validators live here" above for the
+   subprocess-CLI-not-a-dependency reasoning). Add `RUN pip install antcrew` to
+   `docker/Dockerfile` before deploying if you want builds to actually run.
+4. Deploy from this GitHub repo — Railway picks up `railway.json` automatically.
+5. To also expose the read-only API, add a second Railway service from the same repo and
+   override its start command to
+   `python scripts/init_db.py && uvicorn orchestrator.api.app:app --host 0.0.0.0 --port $PORT`.

@@ -23,6 +23,10 @@ dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "black>=23.0", "fastapi>=0.110"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+addopts = "-m 'not integration'"
+markers = [
+    "integration: real subprocess/HTTP end-to-end tests across market-discovery and market-orchestrator (slow, hits the real network, needs market-discovery checked out as a sibling directory with its own .venv). Run with: pytest -m integration",
+]
 
 [project.scripts]
 market-orchestrator = "orchestrator.main:cli"
