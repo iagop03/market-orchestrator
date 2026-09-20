@@ -34,6 +34,51 @@ async def test_sync_from_discovery_dedupes_within_same_batch(orchestrator, db_se
     assert len(stored) == 1
 
 
+async def test_sync_from_discovery_returns_ids_for_acking(orchestrator, db_session, monkeypatch):
+    async def fake_get_new_opportunities():
+        return [{"id": 101, "niche_title": "A niche", "source": "reddit", "niche_description": "x"}]
+
+    monkeypatch.setattr(orchestrator.discovery_client, "get_new_opportunities", fake_get_new_opportunities)
+
+    synced_ids = await orchestrator._sync_from_discovery(db_session)
+    db_session.commit()
+
+    assert synced_ids == [101]
+
+
+async def test_sync_from_discovery_returns_ids_even_for_duplicates(orchestrator, db_session, monkeypatch):
+    """A niche already stored still needs acking — the orchestrator handled it, just via dedup."""
+    db_session.add(Opportunity(niche_title="Already known", source="reddit"))
+    db_session.commit()
+
+    async def fake_get_new_opportunities():
+        return [{"id": 55, "niche_title": "Already known", "source": "reddit", "niche_description": "x"}]
+
+    monkeypatch.setattr(orchestrator.discovery_client, "get_new_opportunities", fake_get_new_opportunities)
+
+    synced_ids = await orchestrator._sync_from_discovery(db_session)
+
+    assert synced_ids == [55]
+
+
+async def test_orchestration_cycle_acks_synced_opportunities_after_commit(orchestrator, db_session, monkeypatch):
+    async def fake_get_new_opportunities():
+        return [{"id": 7, "niche_title": "Ackable niche", "source": "reddit", "niche_description": "x"}]
+
+    monkeypatch.setattr(orchestrator.discovery_client, "get_new_opportunities", fake_get_new_opportunities)
+
+    acked = {}
+
+    async def fake_ack(ids):
+        acked["ids"] = ids
+
+    monkeypatch.setattr(orchestrator.discovery_client, "ack_opportunities", fake_ack)
+
+    await orchestrator.orchestration_cycle()
+
+    assert acked["ids"] == [7]
+
+
 async def test_sync_from_discovery_dedupes_against_existing_rows(orchestrator, db_session, monkeypatch):
     async def first_batch():
         return [{"niche_title": "A niche", "source": "reddit", "niche_description": "x"}]

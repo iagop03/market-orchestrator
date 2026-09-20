@@ -39,7 +39,7 @@ class MarketDrivenOrchestrator:
     async def orchestration_cycle(self) -> None:
         session = get_session()
         try:
-            await self._sync_from_discovery(session)
+            synced_ids = await self._sync_from_discovery(session)
             await self._validate_pending(session)
             await self._build_viable(session)
             session.commit()
@@ -49,19 +49,28 @@ class MarketDrivenOrchestrator:
         finally:
             session.close()
 
-    async def _sync_from_discovery(self, session) -> None:
+        # Ack only after the local commit above durably succeeds — acking any earlier
+        # risks retiring market-discovery's claim on an opportunity we then failed to store.
+        await self.discovery_client.ack_opportunities(synced_ids)
+
+    async def _sync_from_discovery(self, session) -> list[int]:
         new_opps = await self.discovery_client.get_new_opportunities()
         logger.info("Got %d new opportunities from discovery", len(new_opps))
 
+        synced_ids = []
         for data in new_opps:
             existing = (
                 session.query(Opportunity)
                 .filter_by(niche_title=data["niche_title"], source=data["source"])
                 .first()
             )
-            if existing:
-                continue
-            session.add(Opportunity.from_discovery_api(data))
+            if not existing:
+                session.add(Opportunity.from_discovery_api(data))
+
+            opportunity_id = data.get("id")
+            if opportunity_id is not None:
+                synced_ids.append(opportunity_id)
+        return synced_ids
 
     async def _validate_pending(self, session) -> None:
         pending = session.query(Opportunity).filter_by(state=OpportunityState.DISCOVERED.value).all()
